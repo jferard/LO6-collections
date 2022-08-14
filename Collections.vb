@@ -1,6 +1,47 @@
 REM Collections For LibreOffice Basic
 REM Copyright (C) 2022 J. Férard <https://github.com/jferard>
+REM
+REM Trying to create a sane API for collections in Basic. This is a work in progress.
+REM
 Option Explicit
+
+REM
+REM Helpers
+REM
+
+Sub Raise(Optional message As String)
+	MsgBox message
+	Array()(1)
+End Sub
+
+
+Sub AssertEq(actual As Variant, expected As Variant)
+	If actual <> expected Then Raise()
+End Sub
+
+Sub AssertArrayEq(actual() As Variant, expected() As Variant)
+	Dim i As Integer
+
+	If LBound(actual) <> LBound(expected) Or UBound(actual) <> UBound(expected) Then
+		Raise("Different sizes")
+	Else
+		For i=LBound(actual) To UBound(actual)
+			If actual(i) <> expected(i) Then Raise("Differ at " & i)
+		Next i
+	End If
+End Sub
+
+Sub AssertRaises(funcName As String, parameters() As Variant)
+	Dim script As Object
+
+	script = ThisComponent.scriptProvider.getScript("vnd.sun.star.script:Standard.Collections." & funcName & "?language=Basic&location=document")
+	On Error GoTo ok
+	script.invoke(parameters, Array(), Array())
+	On Error GoTo 0
+	Raise()
+ok:
+End Sub
+
 
 REM 
 REM Arrays
@@ -169,8 +210,13 @@ End Function
 Function EnumToArray(e As com.sun.star.container.XEnumeration) As Variant
 	Dim arr(8) As Variant
 	Dim i As Integer
-	i = 0
+
+	If Not e.hasMoreElements() Then
+		EnumToArray = Array()
+		Exit Function
+	End If
 	
+	i = 0
 	Do While e.hasMoreElements()
 		arr(i) = e.nextElement()
 		i = i + 1
@@ -213,17 +259,19 @@ End Function
 
 
 Sub ArrayExamples
-	MsgBox ArrayToString(Array(4, False, "x", ThisComponent))
-	ReversedArray(Array())
+	AssertEq(ArrayToString(Array(4, False, "x", ThisComponent)), "4, False, ""x"", <obj>")
+	AssertArrayEq(ReversedArray(Array()), Array())
 	
-	ReversedArray(Array(4, 5, 6))
-	ReversedArray(Array(3, 4, 5, 6))
+	AssertArrayEq(ReversedArray(Array(4, 5, 6)), Array(6, 5, 4))
+	AssertArrayEq(ReversedArray(Array(3, 4, 5, 6)), Array(6, 5, 4, 3))
 
-	SortedArray(Array(5, 7, 9, 5, 4, 2, 1))
-	SortedArray(Array(5, 7, 9, 5, 4, 2, 1, 10, 18, 16))
+	AssertArrayEq(SortedArray(Array(5, 7, 9, 5, 4, 2, 1)), Array(1, 2, 4, 5, 5, 7, 9))
+	AssertArrayEq(SortedArray(Array(5, 7, 9, 5, 4, 2, 1, 10, 18, 16)), Array(1, 2, 4, 5, 5, 7, 9, 10, 16, 18))
+	AssertArrayEq(SortedArray(Array(80, 16, 9, 14, 68, 0, 46, 98, 74, 37, 18, 58, 69, 28, 62, 53, 76, 2, 57, 20, 11, 72, 84, 86, 50, 78, 39, 40, 27, 94, 81, 67, 61, 26, 12, 96, 19, 71, 92, 47, 75, 6, 42, 55, 54, 17, 21, 66, 8, 59, 63, 45, 88, 44, 49, 41, 4, 83, 22, 31, 82, 99, 5, 48, 79, 1, 73, 77, 65, 38, 90, 30, 91, 32, 43, 25, 33, 35, 85, 60, 87, 51, 36, 70, 7, 29, 56, 93, 24, 15, 89, 52, 13, 95, 10, 34, 64, 3, 23, 97)),_
+		Array(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 23, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99))
+	AssertArrayEq(SortedArray(Array("80", "16", "9", "14", "68", "0", "46", "98", "74", "37", "18", "58", "69", "28", "62", "53", "76", "2", "57", "20", "11", "72", "84", "86", "50", "78", "39", "40", "27", "94", "81", "67", "61", "26", "12", "96", "19", "71", "92", "47", "75", "6", "42", "55", "54", "17", "21", "66", "8", "59", "63", "45", "88", "44", "49", "41", "4", "83", "22", "31", "82", "99", "5", "48", "79", "1", "73", "77", "65", "38", "90", "30", "91", "32", "43", "25", "33", "35", "85", "60", "87", "51", "36", "70", "7", "29", "56", "93", "24", "15", "89", "52", "13", "95", "10", "34", "64", "3", "23", "97")),_
+		Array("0", "1", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "2", "20", "21", "22", "24", "25", "26", "27", "28", "29", "3", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "4", "40", "41", "42", "43", "44", "45", "46", "47", "48", "49", "5", "50", "51", "52", "53", "54", "55", "56", "57", "58", "59", "6", "60", "61", "62", "63", "64", "23", "65", "66", "67", "68", "69", "7", "70", "71", "72", "73", "74", "75", "76", "77", "78", "79", "8", "80", "81", "82", "83", "84", "85", "86", "87", "88", "89", "9", "90", "91", "92", "93", "94", "95", "96", "97", "98", "99"))
 	MsgBox ArrayToString(ShuffledArray(SortedArray(Array(5, 7, 9, 5, 4, 2, 1, 10, 18, 16))))
-	SortedArray(Array(80, 16, 9, 14, 68, 0, 46, 98, 74, 37, 18, 58, 69, 28, 62, 53, 76, 2, 57, 20, 11, 72, 84, 86, 50, 78, 39, 40, 27, 94, 81, 67, 61, 26, 12, 96, 19, 71, 92, 47, 75, 6, 42, 55, 54, 17, 21, 66, 8, 59, 63, 45, 88, 44, 49, 41, 4, 83, 22, 31, 82, 99, 5, 48, 79, 1, 73, 77, 65, 38, 90, 30, 91, 32, 43, 25, 33, 35, 85, 60, 87, 51, 36, 70, 7, 29, 56, 93, 24, 15, 89, 52, 13, 95, 10, 34, 64, 3, 23, 97))'
-	MsgBox ArrayToString(SortedArray(Array("80", "16", "9", "14", "68", "0", "46", "98", "74", "37", "18", "58", "69", "28", "62", "53", "76", "2", "57", "20", "11", "72", "84", "86", "50", "78", "39", "40", "27", "94", "81", "67", "61", "26", "12", "96", "19", "71", "92", "47", "75", "6", "42", "55", "54", "17", "21", "66", "8", "59", "63", "45", "88", "44", "49", "41", "4", "83", "22", "31", "82", "99", "5", "48", "79", "1", "73", "77", "65", "38", "90", "30", "91", "32", "43", "25", "33", "35", "85", "60", "87", "51", "36", "70", "7", "29", "56", "93", "24", "15", "89", "52", "13", "95", "10", "34", "64", "3", "23", "97")))
 End Sub
 
 REM
@@ -464,7 +512,7 @@ Sub ListExamples
 	AppendListElements(list, Array("Z", "W", "T"))
 	InsertListElement(list, 5, "XYZ")
 	RemoveListElement(list, 10)
-	MsgBox ArrayToString(ListToArray(list))
+	AssertArrayEq(ListToArray(list), Array(4, 5, 6, "a", "b", "XYZ", "c", "d", 2, "f", "h", "Z", "W", "T"))
 End Sub
 
 REM 
@@ -554,19 +602,79 @@ Sub SetExamples
 	s = NewSetFromArray("long", Array(1, 3, 5))
 	AddSetElement(s, 15)
 	AddSetElement(s, 8)
-	MsgBox ArrayToString(SetToArray(s))
+	AssertArrayEq(SetToArray(s), Array(1, 3, 5, 8, 15))
 	
 	Dim e As Variant
 	Do While True
 		e = TakeSetElement(s) 
 		If IsEmpty(e) Then Exit Do
 	Loop
+	AssertArrayEq(SetToArray(s), Array())
 End Sub
 
 REM 
-REM HashMap
+REM Maps
 REM
 
-Sub MapExamples
+''
+'' The HashMap type
+''
+Type HashMap
+	keyTypeName As String
+	valueTypeName As String
+	map As com.sun.star.container.EnumerableMap
+End Type
 
+''
+'' Create a new Map.
+''
+Function NewEmptyMap(keyTypeName As String, valueTypeName As String) As HashSet
+	Dim m As HashMap
+
+	m.keyTypeName = keyTypeName
+	m.valueTypeName = valueTypeName
+	m.map = com.sun.star.container.EnumerableMap.create(keyTypeName, valueTypeName)
+
+	NewEmptyMap = m
+End Function
+
+
+Function PutMapElement(m As HashMap, key As Variant, value As Variant)
+	m.map.put(CreateUnoValue(m.keyTypeName, key), CreateUnoValue(m.valueTypeName, value))
+End Function
+
+Function RemoveMapElement(m As HashMap, key As Variant)
+	m.map.remove(CreateUnoValue(m.keyTypeName, key))
+End Function
+
+Function MapContains(m As HashMap, key As Variant) As Boolean
+	MapContains = m.map.containsKey(CreateUnoValue(m.keyTypeName, key))
+End Function
+
+Function GetMapElement(m As HashMap, key As Variant) As Variant
+	GetMapElement = m.map.get(CreateUnoValue(m.keyTypeName, key))
+End Function
+
+Function GetMapElementOrDefault(m As HashMap, key As Variant, default As Variant) As Variant
+	If m.map.containsKey(CreateUnoValue(m.keyTypeName, key)) Then
+		GetMapElementOrDefault = m.map.get(CreateUnoValue(m.keyTypeName, key))
+	Else
+		GetMapElementOrDefault = default
+	End If
+End Function
+
+Sub MapExamples
+	Dim m As HashMap
+	
+	m = NewEmptyMap("string", "long")
+	PutMapElement(m, "a", 1)
+	PutMapElement(m, "b", 2)
+	PutMapElement(m, "c", 3)
+	PutMapElement(m, "d", 4)
+	AssertEq(MapContains(m, "b"), True)
+	AssertEq(GetMapElement(m, "b"), 2)
+	RemoveMapElement(m, "b")
+	AssertEq(GetMapElementOrDefault(m, "e", 20), 20)
+	AssertEq(MapContains(m, "b"), False)
+	AssertRaises("GetMapElement", Array(m, "b"))
 End Sub
