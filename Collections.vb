@@ -42,7 +42,7 @@ Sub AssertRaises(funcName As String, parameters() As Variant)
 ok:
 End Sub
 
-Sub AssertExamples()
+Sub AssertTests()
 	AssertEq("ABC", UCase("abc"))
 	AssertArrayEq(Array(), Array())
 	AssertArrayEq(Array(1, 2), Array(1, 2))
@@ -284,11 +284,11 @@ Function ArrayToString(arr() As Variant) As String
 End Function
 
 
-Sub ArrayExamples
+Sub ArrayTests
 	AssertEq(ArrayToString(Array(4, False, "x", ThisComponent)), "4, False, ""x"", <obj>")
 	AssertArrayEq(ReversedArray(Array()), Array())
 	
-	AssertArrayEq(ReversedArray(Array(4, 5, 6)), Array(7, 5, 4))
+	AssertArrayEq(ReversedArray(Array(4, 5, 6)), Array(6, 5, 4))
 	AssertArrayEq(ReversedArray(Array(3, 4, 5, 6)), Array(6, 5, 4, 3))
 
 	AssertArrayEq(SortedArray(Array(5, 7, 9, 5, 4, 2, 1)), Array(1, 2, 4, 5, 5, 7, 9))
@@ -297,7 +297,7 @@ Sub ArrayExamples
 		Array(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 23, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99))
 	AssertArrayEq(SortedArray(Array("80", "16", "9", "14", "68", "0", "46", "98", "74", "37", "18", "58", "69", "28", "62", "53", "76", "2", "57", "20", "11", "72", "84", "86", "50", "78", "39", "40", "27", "94", "81", "67", "61", "26", "12", "96", "19", "71", "92", "47", "75", "6", "42", "55", "54", "17", "21", "66", "8", "59", "63", "45", "88", "44", "49", "41", "4", "83", "22", "31", "82", "99", "5", "48", "79", "1", "73", "77", "65", "38", "90", "30", "91", "32", "43", "25", "33", "35", "85", "60", "87", "51", "36", "70", "7", "29", "56", "93", "24", "15", "89", "52", "13", "95", "10", "34", "64", "3", "23", "97")),_
 		Array("0", "1", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "2", "20", "21", "22", "24", "25", "26", "27", "28", "29", "3", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "4", "40", "41", "42", "43", "44", "45", "46", "47", "48", "49", "5", "50", "51", "52", "53", "54", "55", "56", "57", "58", "59", "6", "60", "61", "62", "63", "64", "23", "65", "66", "67", "68", "69", "7", "70", "71", "72", "73", "74", "75", "76", "77", "78", "79", "8", "80", "81", "82", "83", "84", "85", "86", "87", "88", "89", "9", "90", "91", "92", "93", "94", "95", "96", "97", "98", "99"))
-	MsgBox ArrayToString(ShuffledArray(SortedArray(Array(5, 7, 9, 5, 4, 2, 1, 10, 18, 16))))
+	MsgBox "Shuffle :" & ArrayToString(ShuffledArray(SortedArray(Array(5, 7, 9, 5, 4, 2, 1, 10, 18, 16))))
 End Sub
 
 REM
@@ -553,7 +553,7 @@ Function ListIndexOf(list As ArrayList, element As Variant) As Integer
 End Function
 
 
-Sub ListExamples
+Sub ListTests
 	Dim list As ArrayList
 	list = NewList(Array(4, 5, 6))
 	AppendListElement(list, "a")
@@ -690,7 +690,7 @@ Function GetSetSize(s As HashSet) As Variant
 	Dim e As Object
 	
 	e = s.map.createKeyEnumeration(True)
-	GetSetSize = _GetEnumSize(e)
+	GetSetSize = GetEnumSize(e)
 End Function
 
 ''
@@ -703,23 +703,31 @@ Function SetIsEmpty(s As HashSet) As Variant
 	SetIsEmpty = Not e.hasMoreElements()
 End Function
 
-Sub SetExamples
+Sub SetTests
 	Dim s As HashSet
+	Dim e As Variant
+	s = NewEmptySet("string")
+	AssertEq(SetIsEmpty(s), True)
+	
+	
 	s = NewSetFromArray("long", Array(1, 3, 5))
 	AddSetElement(s, 15)
 	AddSetElement(s, 8)
 	AddSetElement(s, 3)
-	AssertArrayEq(SetToArray(s), Array(1, 3, 5, 8, 15))
 
+	AssertArrayEq(SetToArray(s), Array(1, 3, 5, 8, 15))
 	AssertEq(GetSetSize(s), 5)
 	
-	Dim e As Variant
-	Do While True
-    		e = TakeSetElement(s) 
-		If IsEmpty(e) Then Exit Do
+	Do While Not SetIsEmpty(s)
+		e = TakeSetElement(s) 
+		AssertEq(IsEmpty(e), False)
 	Loop
+	
 	AssertEq(SetIsEmpty(s), True)
 	AssertArrayEq(SetToArray(s), Array())
+
+	e = TakeSetElement(s) 
+	AssertEq(IsEmpty(e), True)
 End Sub
 
 REM 
@@ -758,8 +766,8 @@ End Function
 ''
 '' Remove a Map element by key
 ''
-Function RemoveMapElement(m As HashMap, key As Variant)
-	m.map.remove(CreateUnoValue(m.keyTypeName, key))
+Function RemoveMapElement(m As HashMap, key As Variant) As Variant
+	RemoveMapElement = m.map.remove(CreateUnoValue(m.keyTypeName, key))
 End Function
 
 ''
@@ -844,7 +852,7 @@ Function MapIsEmpty(m As HashMap) As Variant
 	MapIsEmpty = Not e.hasMoreElements()
 End Function
 
-Sub MapExamples
+Sub MapTests
 	Dim m As HashMap
 	
 	m = NewEmptyMap("string", "long")
@@ -861,12 +869,26 @@ Sub MapExamples
 
 	AssertArrayEq(MapKeysToArray(m), SortedArray(Array("a", "b", "c")))
 	AssertArrayEq(MapValuesToArray(m), SortedArray(Array(1, 2, 3)))
+
+	AssertEq(GetMapSize(m), 3)
 	
 	PutMapElement(m, "d", 4)
-	AssertEq(MapContains(m, "b"), True)
-	AssertEq(GetMapElement(m, "b"), 2)
-	RemoveMapElement(m, "b")
 	AssertEq(GetMapElementOrDefault(m, "e", 20), 20)
+
+	AssertEq(MapContains(m, "b"), True)
+	AssertEq(GetMapSize(m), 4)
+	AssertEq(GetMapElement(m, "b"), 2)
+	AssertEq(RemoveMapElement(m, "b"), 2)
 	AssertEq(MapContains(m, "b"), False)
+	AssertEq(GetMapSize(m), 3)
+	
 	AssertRaises("GetMapElement", Array(m, "b"))
+End Sub
+
+Sub AllTests()
+	AssertTests()
+	ArrayTests()
+	ListTests()
+	SetTests()
+	MapTests()
 End Sub
