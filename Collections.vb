@@ -11,22 +11,22 @@ REM
 
 Sub Raise(Optional message As String)
 	MsgBox message
-	Array()(1)
+	Error(1004)
 End Sub
 
 
 Sub AssertEq(actual As Variant, expected As Variant)
-	If actual <> expected Then Raise()
+	If actual <> expected Then Raise("Value " & actual & " is different from expected : " & expected)
 End Sub
 
 Sub AssertArrayEq(actual() As Variant, expected() As Variant)
 	Dim i As Integer
 
 	If LBound(actual) <> LBound(expected) Or UBound(actual) <> UBound(expected) Then
-		Raise("Different sizes")
+		Raise("Arrays have different sizes")
 	Else
 		For i=LBound(actual) To UBound(actual)
-			If actual(i) <> expected(i) Then Raise("Differ at " & i)
+			If actual(i) <> expected(i) Then Raise("Arrays differ at index " & i & ": " & actual(i) & " is different from expected : " & expected(i))
 		Next i
 	End If
 End Sub
@@ -34,13 +34,66 @@ End Sub
 Sub AssertRaises(funcName As String, parameters() As Variant)
 	Dim script As Object
 
-	script = ThisComponent.scriptProvider.getScript("vnd.sun.star.script:Standard.Collections." & funcName & "?language=Basic&location=document")
 	On Error GoTo ok
+	script = ThisComponent.scriptProvider.getScript("vnd.sun.star.script:Standard.Collections." & funcName & "?language=Basic&location=document")
 	script.invoke(parameters, Array(), Array())
 	On Error GoTo 0
-	Raise()
+	Raise("Call " & funcName & "(" & ArrayToString(parameters) & ") did not raise any error")
 ok:
 End Sub
+
+Sub AssertExamples()
+	AssertEq("ABC", UCase("abc"))
+	AssertArrayEq(Array(), Array())
+	AssertArrayEq(Array(1, 2), Array(1, 2))
+	AssertRaises("Arrai", Array(1, 2))
+End Sub
+
+REM
+REM Enums Helpers
+REM
+
+''
+'' Make an Array out of an XEnumeration
+''
+Function EnumToArray(e As com.sun.star.container.XEnumeration) As Variant
+	Dim arr(8) As Variant
+	Dim i As Integer
+
+	If Not e.hasMoreElements() Then
+		EnumToArray = Array()
+		Exit Function
+	End If
+	
+	i = 0
+	Do While e.hasMoreElements()
+		arr(i) = e.nextElement()
+		i = i + 1
+		If i > UBound(arr) Then
+			ReDim Preserve arr(i * 2)
+		End If
+	Loop
+	
+	
+	ReDim Preserve arr(i - 1)
+	
+	EnumToArray = arr
+End Function
+
+''
+'' Find the size of an XEnumeration
+''
+Function GetEnumSize(e As com.sun.star.container.XEnumeration) As Integer
+	Dim i As Integer
+
+	i = 0
+	Do While e.hasMoreElements()
+		e.nextElement()
+		i = i + 1
+	Loop
+	
+	GetEnumSize = i
+End Function
 
 
 REM 
@@ -205,33 +258,6 @@ Function ShuffledArray(arr() As Variant) As Variant
 End Function
 
 ''
-'' Make an array out of an XEnumeration
-''
-Function EnumToArray(e As com.sun.star.container.XEnumeration) As Variant
-	Dim arr(8) As Variant
-	Dim i As Integer
-
-	If Not e.hasMoreElements() Then
-		EnumToArray = Array()
-		Exit Function
-	End If
-	
-	i = 0
-	Do While e.hasMoreElements()
-		arr(i) = e.nextElement()
-		i = i + 1
-		If i > UBound(arr) Then
-			ReDim Preserve arr(i * 2)
-		End If
-	Loop
-	
-	
-	ReDim Preserve arr(i - 1)
-	
-	EnumToArray = arr
-End Function
-
-''
 '' Return a representation of this array 
 ''
 Function ArrayToString(arr() As Variant) As String
@@ -262,7 +288,7 @@ Sub ArrayExamples
 	AssertEq(ArrayToString(Array(4, False, "x", ThisComponent)), "4, False, ""x"", <obj>")
 	AssertArrayEq(ReversedArray(Array()), Array())
 	
-	AssertArrayEq(ReversedArray(Array(4, 5, 6)), Array(6, 5, 4))
+	AssertArrayEq(ReversedArray(Array(4, 5, 6)), Array(7, 5, 4))
 	AssertArrayEq(ReversedArray(Array(3, 4, 5, 6)), Array(6, 5, 4, 3))
 
 	AssertArrayEq(SortedArray(Array(5, 7, 9, 5, 4, 2, 1)), Array(1, 2, 4, 5, 5, 7, 9))
@@ -497,12 +523,48 @@ Function ListToArray(list As ArrayList) As Variant
 	End If
 End Function
 
+''
+'' Return the size of a list
+''
+Function GetListSize(list As ArrayList) As Integer
+	GetListSize = list.size
+End Function
+
+''
+'' Return True if the list is empty
+''
+Function ListIsEmpty(list As ArrayList) As Boolean
+	ListIsEmpty = (list.size = 0)
+End Function
+
+''
+'' Return the index of element in the list, or -1 if element is not in the list
+''
+Function ListIndexOf(list As ArrayList, element As Variant) As Integer
+	Dim i As Integer
+
+	For i=0 To list.size - 1
+		If list.arr(i) = element Then
+			ListIndexOf = i
+			Exit Function
+		End If
+	Next i
+	ListIndexOf = -1
+End Function
+
+
 Sub ListExamples
 	Dim list As ArrayList
 	list = NewList(Array(4, 5, 6))
 	AppendListElement(list, "a")
 	AppendListElement(list, "b")
 	AppendListElement(list, "c")
+	
+	AssertEq(GetListSize(list), 6)
+	AssertEq(ListIsEmpty(list), False)
+	AssertEq(ListIndexOf(list, "b"), 4)
+	AssertEq(ListIndexOf(list, "d"), -1)
+	
 	AppendListElement(list, "d")
 	AppendListElement(list, 2)
 	AppendListElement(list, "f")
@@ -528,7 +590,7 @@ Type HashSet
 End Type
 
 ''
-'' Create a new Set.
+'' Create a new Set of type typeName
 ''
 Function NewSet(typeName As String, Optional arr As Variant) As HashSet
 	If IsMissing(arr) Then 
@@ -538,6 +600,9 @@ Function NewSet(typeName As String, Optional arr As Variant) As HashSet
 	End If
 End Function
 
+''
+'' Create a new empty Set of type typeName
+''
 Function NewEmptySet(typeName As String) As HashSet
 	Dim s As HashSet
 
@@ -547,6 +612,9 @@ Function NewEmptySet(typeName As String) As HashSet
 	NewEmptySet = s
 End Function
 
+''
+'' Create a new Set of type typeName having the elements arr
+''
 Function NewSetFromArray(typeName As String, arr() As Variant) As HashSet
 	Dim s As HashSet
 
@@ -556,10 +624,16 @@ Function NewSetFromArray(typeName As String, arr() As Variant) As HashSet
 	NewSetFromArray = s
 End Function
 
+''
+'' Add an element to a Set
+''
 Function AddSetElement(s As HashSet, element As Variant)
 	s.map.put(CreateUnoValue(s.typeName, element), 1)
 End Function
 
+''
+'' Add some elements to a Set
+''
 Sub AddSetElements(s As HashSet, arr() As Variant)
 	Dim element As Variant
 	
@@ -568,14 +642,23 @@ Sub AddSetElements(s As HashSet, arr() As Variant)
 	Next element
 End Sub
 
+''
+'' Remove an element from a Set
+''
 Function RemoveSetElement(s As HashSet, element As Variant)
 	s.map.remove(CreateUnoValue(s.typeName, element))
 End Function
 
+''
+'' Return True if the Set contains this element
+''
 Function SetContains(s As HashSet, element As Variant) As Boolean
 	Contains = s.map.containsKey(element)
 End Function
 
+''
+'' Remove a random element from the Set and return it
+''
 Function TakeSetElement(s As HashSet) As Variant
 	Dim e As Object
 	Dim element As Variant
@@ -590,6 +673,9 @@ Function TakeSetElement(s As HashSet) As Variant
 	End If
 End Function
 
+''
+'' Copy the elements of the Set to an Array
+''
 Function SetToArray(s As HashSet) As Variant
 	Dim e As Object
 	
@@ -597,18 +683,42 @@ Function SetToArray(s As HashSet) As Variant
 	SetToArray = EnumToArray(e)
 End Function
 
+''
+'' Return the Set size
+''
+Function GetSetSize(s As HashSet) As Variant
+	Dim e As Object
+	
+	e = s.map.createKeyEnumeration(True)
+	GetSetSize = _GetEnumSize(e)
+End Function
+
+''
+'' Return True if the Set is empty
+''
+Function SetIsEmpty(s As HashSet) As Variant
+	Dim e As Object
+	
+	e = s.map.createKeyEnumeration(True)
+	SetIsEmpty = Not e.hasMoreElements()
+End Function
+
 Sub SetExamples
 	Dim s As HashSet
 	s = NewSetFromArray("long", Array(1, 3, 5))
 	AddSetElement(s, 15)
 	AddSetElement(s, 8)
+	AddSetElement(s, 3)
 	AssertArrayEq(SetToArray(s), Array(1, 3, 5, 8, 15))
+
+	AssertEq(GetSetSize(s), 5)
 	
 	Dim e As Variant
 	Do While True
-		e = TakeSetElement(s) 
+    		e = TakeSetElement(s) 
 		If IsEmpty(e) Then Exit Do
 	Loop
+	AssertEq(SetIsEmpty(s), True)
 	AssertArrayEq(SetToArray(s), Array())
 End Sub
 
@@ -638,23 +748,37 @@ Function NewEmptyMap(keyTypeName As String, valueTypeName As String) As HashSet
 	NewEmptyMap = m
 End Function
 
-
+''
+'' Remove a key-value pair in the Map
+''
 Function PutMapElement(m As HashMap, key As Variant, value As Variant)
 	m.map.put(CreateUnoValue(m.keyTypeName, key), CreateUnoValue(m.valueTypeName, value))
 End Function
 
+''
+'' Remove a Map element by key
+''
 Function RemoveMapElement(m As HashMap, key As Variant)
 	m.map.remove(CreateUnoValue(m.keyTypeName, key))
 End Function
 
+''
+'' Return True if the Map contains this Key
+''
 Function MapContains(m As HashMap, key As Variant) As Boolean
 	MapContains = m.map.containsKey(CreateUnoValue(m.keyTypeName, key))
 End Function
 
+''
+'' Return the value mapped to this key, or raise an exception
+''
 Function GetMapElement(m As HashMap, key As Variant) As Variant
 	GetMapElement = m.map.get(CreateUnoValue(m.keyTypeName, key))
 End Function
 
+''
+'' Return the value mapped to this key, or a default value
+''
 Function GetMapElementOrDefault(m As HashMap, key As Variant, default As Variant) As Variant
 	If m.map.containsKey(CreateUnoValue(m.keyTypeName, key)) Then
 		GetMapElementOrDefault = m.map.get(CreateUnoValue(m.keyTypeName, key))
@@ -663,13 +787,81 @@ Function GetMapElementOrDefault(m As HashMap, key As Variant, default As Variant
 	End If
 End Function
 
+''
+'' Return an Array of the keys.
+''
+Function MapKeysToArray(m As HashMap) As Variant
+	Dim e As Object
+	
+	e = m.map.createKeyEnumeration(True)
+	MapKeysToArray = EnumToArray(e)
+End Function
+
+''
+'' Return an Array of the values.
+''
+Function MapValuesToArray(m As HashMap) As Variant
+	Dim e As Object
+	
+	e = m.map.createValueEnumeration(True)
+	MapValuesToArray = EnumToArray(e)
+End Function
+
+
+''
+'' Return an Set of the keys.
+''
+Function MapKeysToSet(m As HashMap) As Variant
+	Dim s As HashSet
+
+	s = NewEmptySet(m.keyTypeName)
+	
+	e = m.map.createKeyEnumeration(True)
+	Do While e.hasNext()
+		AddSetElement(e.nextElement())
+	Loop	
+	
+	MapKeysToSet = s
+End Function
+
+''
+'' Return the Map size
+''
+Function GetMapSize(m As HashMap) As Variant
+	Dim e As Object
+	
+	e = m.map.createKeyEnumeration(True)
+	GetMapSize = GetEnumSize(e)
+End Function
+
+''
+'' Return True if the Map is empty
+''
+Function MapIsEmpty(m As HashMap) As Variant
+	Dim e As Object
+	
+	e = m.map.createKeyEnumeration(True)
+	MapIsEmpty = Not e.hasMoreElements()
+End Function
+
 Sub MapExamples
 	Dim m As HashMap
 	
 	m = NewEmptyMap("string", "long")
+	
+	AssertEq(MapIsEmpty(m), True)
+	
 	PutMapElement(m, "a", 1)
+
+	AssertEq(MapIsEmpty(m), False)
+	AssertEq(GetMapSize(m), 1)
+
 	PutMapElement(m, "b", 2)
 	PutMapElement(m, "c", 3)
+
+	AssertArrayEq(MapKeysToArray(m), SortedArray(Array("a", "b", "c")))
+	AssertArrayEq(MapValuesToArray(m), SortedArray(Array(1, 2, 3)))
+	
 	PutMapElement(m, "d", 4)
 	AssertEq(MapContains(m, "b"), True)
 	AssertEq(GetMapElement(m, "b"), 2)
