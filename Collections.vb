@@ -261,26 +261,34 @@ End Function
 '' Return a representation of this array 
 ''
 Function ArrayToString(arr() As Variant) As String
-	Dim i, vt As Integer
+	Dim i As Integer
 
 	Dim newArr(LBound(arr) To UBound(arr)) As String
 	For i=LBound(arr) To UBound(arr)
-		Select Case VarType(arr(i))
-		Case V_STRING
-			newArr(i) = """" & arr(i) & """"
-		Case 11
-			If arr(i) Then 
-				newArr(i) = "True"
-			Else
-				newArr(i) = "False"
-			End If
-		Case 9
-			newArr(i) = "<obj>"
-		Case Else
-			newArr(i) = CStr(arr(i))
-		End Select
+		newArr(i) = UnoValueToString(arr(i))
 	Next i
 	ArrayToString = Join(newArr, ", ")
+End Function
+
+
+''
+'' Return a String of a UNOValue
+''
+Function UnoValueToString(value As Variant) As String
+	Select Case VarType(value)
+	Case V_STRING
+		UnoValueToString = """" & value & """"
+	Case 11
+		If value Then 
+			UnoValueToString = "True"
+		Else
+			UnoValueToString = "False"
+		End If
+	Case 9
+		UnoValueToString = "<obj>"
+	Case Else
+		UnoValueToString = CStr(value)
+	End Select
 End Function
 
 
@@ -553,6 +561,28 @@ Function ListIndexOf(list As ArrayList, element As Variant) As Integer
 End Function
 
 
+Function ListLastIndexOf(list As ArrayList, element As Variant) As Integer
+	Dim i As Integer
+
+	For i=list.size-1 To 0 Step -1
+		If list.arr(i) = element Then
+			ListLastIndexOf = i
+			Exit Function
+		End If
+	Next i
+	ListLastIndexOf = -1
+End Function
+
+Function ListToString(list As ArrayList) As String
+	Dim i As Integer
+
+	Dim newArr(0 To list.size - 1) As String
+	For i=0 To list.size - 1
+		newArr(i) = UnoValueToString(list.arr(i))
+	Next i
+	ListToString = "[" & Join(newArr, ", ") & "]"
+End Function
+
 Sub ListTests
 	Dim list As ArrayList
 	list = NewList(Array(4, 5, 6))
@@ -563,6 +593,7 @@ Sub ListTests
 	AssertEq(GetListSize(list), 6)
 	AssertEq(ListIsEmpty(list), False)
 	AssertEq(ListIndexOf(list, "b"), 4)
+	AssertEq(ListLastIndexOf(list, "b"), 4)
 	AssertEq(ListIndexOf(list, "d"), -1)
 	
 	AppendListElement(list, "d")
@@ -575,6 +606,7 @@ Sub ListTests
 	InsertListElement(list, 5, "XYZ")
 	RemoveListElement(list, 10)
 	AssertArrayEq(ListToArray(list), Array(4, 5, 6, "a", "b", "XYZ", "c", "d", 2, "f", "h", "Z", "W", "T"))
+	AssertEq(ListToString(list), "[4, 5, 6, ""a"", ""b"", ""XYZ"", ""c"", ""d"", 2, ""f"", ""h"", ""Z"", ""W"", ""T""]")
 End Sub
 
 REM 
@@ -703,6 +735,11 @@ Function SetIsEmpty(s As HashSet) As Variant
 	SetIsEmpty = Not e.hasMoreElements()
 End Function
 
+Function SetToString(s As HashSet) As String
+	SetToString = "{" & ArrayToString(SetToArray(s)) & "}"
+End Function
+
+
 Sub SetTests
 	Dim s As HashSet
 	Dim e As Variant
@@ -716,6 +753,7 @@ Sub SetTests
 	AddSetElement(s, 3)
 
 	AssertArrayEq(SetToArray(s), Array(1, 3, 5, 8, 15))
+	AssertEq(SetToString(s), "{1, 3, 5, 8, 15}")
 	AssertEq(GetSetSize(s), 5)
 	
 	Do While Not SetIsEmpty(s)
@@ -852,6 +890,62 @@ Function MapIsEmpty(m As HashMap) As Variant
 	MapIsEmpty = Not e.hasMoreElements()
 End Function
 
+''
+'' Return a copy of the map
+''
+Function CopyMap(m As HashMap) As HashMap
+	Dim newM As HashMap
+	Dim e, p As Variant
+	
+	newM = NewEmptyMap(m.keyTypeName, m.valueTypeName)
+	e = m.map.createElementEnumeration(True)
+	Do While e.hasMoreElements()
+		p = e.nextElement()
+		PutMapElement(newM, p.First, p.Second)
+	Loop
+	
+	CopyMap = newM
+End Function
+
+
+''
+'' Return a merged map
+''
+Function MergeMaps(m1 As HashMap, m2 As HashMap) As HashMap
+	Dim newM As HashMap
+	Dim e, p As Variant
+	
+	newM = NewEmptyMap(m1.keyTypeName, m1.valueTypeName)
+	e = m1.map.createElementEnumeration(True)
+	Do While e.hasMoreElements()
+		p = e.nextElement()
+		PutMapElement(newM, p.First, p.Second)
+	Loop
+	e = m2.map.createElementEnumeration(True)
+	Do While e.hasMoreElements()
+		p = e.nextElement()
+		PutMapElement(newM, p.First, p.Second)
+	Loop
+	
+	MergeMaps = newM
+End Function
+
+Function MapToString(m As HashMap) As String
+	Dim i As Integer
+	Dim e, p, arr As Variant
+	
+	e = m.map.createElementEnumeration(True)
+	arr = EnumToArray(e)
+
+	Dim newArr(LBound(arr) To UBound(arr)) As String
+	For i=LBound(arr) To UBound(arr)
+		p = arr(i)
+		newArr(i) = UnoValueToString(p.First) & ": " & UnoValueToString(p.Second)
+	Next i
+	MapToString = "{" & Join(newArr, ", ") & "}"
+End Function
+
+
 Sub MapTests
 	Dim m As HashMap
 	
@@ -877,12 +971,20 @@ Sub MapTests
 
 	AssertEq(MapContains(m, "b"), True)
 	AssertEq(GetMapSize(m), 4)
+	AssertEq(MapToString(m), "{""a"": 1, ""b"": 2, ""c"": 3, ""d"": 4}")
 	AssertEq(GetMapElement(m, "b"), 2)
 	AssertEq(RemoveMapElement(m, "b"), 2)
 	AssertEq(MapContains(m, "b"), False)
 	AssertEq(GetMapSize(m), 3)
 	
 	AssertRaises("GetMapElement", Array(m, "b"))
+	
+	Dim m2 As HashMap
+	m2 = NewEmptyMap("string", "long")
+	PutMapElement(m2, "foo", 100)
+	
+	m = MergeMaps(m, m2)
+	AssertEq(MapToString(m), "{""a"": 1, ""c"": 3, ""d"": 4, ""foo"": 100}")
 End Sub
 
 Sub AllTests()
