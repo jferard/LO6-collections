@@ -20,7 +20,7 @@ Sub AssertEq(actual As Variant, expected As Variant)
 End Sub
 
 Sub AssertArrayEq(actual() As Variant, expected() As Variant)
-	Dim i As Integer
+	Dim i As Long
 
 	If LBound(actual) <> LBound(expected) Or UBound(actual) <> UBound(expected) Then
 		Raise("Arrays have different sizes")
@@ -58,7 +58,7 @@ REM
 ''
 Function EnumToArray(e As com.sun.star.container.XEnumeration) As Variant
 	Dim arr(8) As Variant
-	Dim i As Integer
+	Dim i As Long
 
 	If Not e.hasMoreElements() Then
 		EnumToArray = Array()
@@ -83,8 +83,8 @@ End Function
 ''
 '' Find the size of an XEnumeration
 ''
-Function GetEnumSize(e As com.sun.star.container.XEnumeration) As Integer
-	Dim i As Integer
+Function GetEnumSize(e As com.sun.star.container.XEnumeration) As Long
+	Dim i As Long
 
 	i = 0
 	Do While e.hasMoreElements()
@@ -140,8 +140,8 @@ End Function
 '' Return the array sorted (merge sort algorithm)
 ''
 Function SortedArray(arr() As Variant) As Variant
-	Dim size As Integer
-	Dim i, j, n As Integer
+	Dim size As Long
+	Dim i, j, n As Long
 	Dim cur, other, temp As Variant
 	
 	size = UBound(arr) - LBound(arr) + 1
@@ -175,7 +175,7 @@ End Function
 ' prepare the first copy : swap pairs if necessary
 Function _CopySwap(arr As Variant) As Variant
 	Dim arr1(LBound(arr) To UBound(arr)) As Variant
-	Dim i As Integer
+	Dim i As Long
 	
 	arr1(UBound(arr)) = arr(UBound(arr))
 	For i=LBound(arr) To UBound(arr) - 1 Step 2
@@ -191,8 +191,8 @@ Function _CopySwap(arr As Variant) As Variant
 End Function
 
 ' merge two sorted sequences
-Sub _Merge(cur As Variant, i As Integer, n As Integer, other As Variant)
-	Dim a, b, c, s As Integer
+Sub _Merge(cur As Variant, i As Long, n As Long, other As Variant)
+	Dim a, b, c, s As Long
 
 	s = i + 2 * n
 	If s > UBound(other) + 1 Then s = UBound(other) + 1
@@ -200,7 +200,14 @@ Sub _Merge(cur As Variant, i As Integer, n As Integer, other As Variant)
 	c = i
 	a = i
 	b = i + n
-	If b >= s Then Exit Sub 
+	If b >= s Then 
+		Do While c < s
+			other(c) = cur(a)
+			c = c + 1
+			a = a + 1
+		Loop
+		Exit Sub 
+	End If
 	
 	Do While True
 		If cur(a) < cur(b) Then
@@ -223,6 +230,7 @@ Sub _Merge(cur As Variant, i As Integer, n As Integer, other As Variant)
 			If c = s Then Exit Sub
 			b = b + 1
 			If b = s Then 
+				' flush a
 				Do While c < s
 					other(c) = cur(a)
 					c = c + 1
@@ -235,6 +243,42 @@ Sub _Merge(cur As Variant, i As Integer, n As Integer, other As Variant)
 End Sub
 
 ''
+'' Sort the array in place.
+''
+Sub SortArrayInPlace(ByRef arr() As Variant)
+	_QuickSort(arr, LBound(arr), UBound(arr))
+End Sub
+
+Sub _QuickSort(ByRef arr() As Variant, p As Long, r As Long)
+	If p >= r Then Exit Sub
+	Dim q As Long
+	q = _Partition(arr, p, r)
+	_QuickSort(arr, p, q - 1)
+	_QuickSort(arr, q + 1, r)
+End Sub
+
+Function _Partition(ByRef arr() As Variant, p As Long, r As Long) As Long
+	Dim x, temp As Variant
+	Dim i, j As Long
+
+	i = Int(Rnd() * (r - p + 1)) + p  ' 0 <= Rnd() < 1 => p <= i < (r - p + 1) + p = r + 1
+	x = arr(i)
+	arr(i) = arr(r)
+	i = p - 1
+	For j = p To r - 1
+		If arr(j) <= x Then
+			i = i + 1 ' p <= i <= j, swap j
+			temp = arr(j)
+			arr(j) = arr(i)
+			arr(i) = temp
+		End If
+	Next j
+	arr(r) = arr(i + 1)
+	arr(i + 1) = x
+	_Partition = i + 1
+End Function
+
+''
 '' Return the array shuffled (Fisher Yates shuffle, a.k.a Knuth)
 ''
 Function ShuffledArray(arr() As Variant) As Variant
@@ -243,7 +287,7 @@ Function ShuffledArray(arr() As Variant) As Variant
 		Exit Function
 	End If
 
-	Dim i, j As Integer
+	Dim i, j As Long
 	Dim temp, newArr() As Variant
 	newArr = copyArray(arr)
 
@@ -261,7 +305,7 @@ End Function
 '' Return a representation of this array 
 ''
 Function ArrayToString(arr() As Variant) As String
-	Dim i As Integer
+	Dim i As Long
 
 	Dim newArr(LBound(arr) To UBound(arr)) As String
 	For i=LBound(arr) To UBound(arr)
@@ -299,12 +343,73 @@ Sub ArrayTests
 	AssertArrayEq(ReversedArray(Array(4, 5, 6)), Array(6, 5, 4))
 	AssertArrayEq(ReversedArray(Array(3, 4, 5, 6)), Array(6, 5, 4, 3))
 
+	' Sorted
 	AssertArrayEq(SortedArray(Array(5, 7, 9, 5, 4, 2, 1)), Array(1, 2, 4, 5, 5, 7, 9))
 	AssertArrayEq(SortedArray(Array(5, 7, 9, 5, 4, 2, 1, 10, 18, 16)), Array(1, 2, 4, 5, 5, 7, 9, 10, 16, 18))
 	AssertArrayEq(SortedArray(Array(80, 16, 9, 14, 68, 0, 46, 98, 74, 37, 18, 58, 69, 28, 62, 53, 76, 2, 57, 20, 11, 72, 84, 86, 50, 78, 39, 40, 27, 94, 81, 67, 61, 26, 12, 96, 19, 71, 92, 47, 75, 6, 42, 55, 54, 17, 21, 66, 8, 59, 63, 45, 88, 44, 49, 41, 4, 83, 22, 31, 82, 99, 5, 48, 79, 1, 73, 77, 65, 38, 90, 30, 91, 32, 43, 25, 33, 35, 85, 60, 87, 51, 36, 70, 7, 29, 56, 93, 24, 15, 89, 52, 13, 95, 10, 34, 64, 3, 23, 97)),_
-		Array(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 23, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99))
+		Array(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99))
 	AssertArrayEq(SortedArray(Array("80", "16", "9", "14", "68", "0", "46", "98", "74", "37", "18", "58", "69", "28", "62", "53", "76", "2", "57", "20", "11", "72", "84", "86", "50", "78", "39", "40", "27", "94", "81", "67", "61", "26", "12", "96", "19", "71", "92", "47", "75", "6", "42", "55", "54", "17", "21", "66", "8", "59", "63", "45", "88", "44", "49", "41", "4", "83", "22", "31", "82", "99", "5", "48", "79", "1", "73", "77", "65", "38", "90", "30", "91", "32", "43", "25", "33", "35", "85", "60", "87", "51", "36", "70", "7", "29", "56", "93", "24", "15", "89", "52", "13", "95", "10", "34", "64", "3", "23", "97")),_
-		Array("0", "1", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "2", "20", "21", "22", "24", "25", "26", "27", "28", "29", "3", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "4", "40", "41", "42", "43", "44", "45", "46", "47", "48", "49", "5", "50", "51", "52", "53", "54", "55", "56", "57", "58", "59", "6", "60", "61", "62", "63", "64", "23", "65", "66", "67", "68", "69", "7", "70", "71", "72", "73", "74", "75", "76", "77", "78", "79", "8", "80", "81", "82", "83", "84", "85", "86", "87", "88", "89", "9", "90", "91", "92", "93", "94", "95", "96", "97", "98", "99"))
+		Array("0", "1", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "2", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "3", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "4", "40", "41", "42", "43", "44", "45", "46", "47", "48", "49", "5", "50", "51", "52", "53", "54", "55", "56", "57", "58", "59", "6", "60", "61", "62", "63", "64", "65", "66", "67", "68", "69", "7", "70", "71", "72", "73", "74", "75", "76", "77", "78", "79", "8", "80", "81", "82", "83", "84", "85", "86", "87", "88", "89", "9", "90", "91", "92", "93", "94", "95", "96", "97", "98", "99"))
+
+	' SortInPlace
+	Dim arr As Variant
+	arr = Array(5, 7, 9, 5, 4, 2, 1)
+	SortArrayInPlace(arr)
+	AssertArrayEq(arr, Array(1, 2, 4, 5, 5, 7, 9))
+
+	arr = Array(5, 7, 9, 5, 4, 2, 1, 10, 18, 16)
+	SortArrayInPlace(arr)
+	AssertArrayEq(arr, Array(1, 2, 4, 5, 5, 7, 9, 10, 16, 18))
+	
+	arr = Array(80, 16, 9, 14, 68, 0, 46, 98, 74, 37, 18, 58, 69, 28, 62, 53, 76, 2, 57, 20, 11, 72, 84, 86, 50, 78, 39, 40, 27, 94, 81, 67, 61, 26, 12, 96, 19, 71, 92, 47, 75, 6, 42, 55, 54, 17, 21, 66, 8, 59, 63, 45, 88, 44, 49, 41, 4, 83, 22, 31, 82, 99, 5, 48, 79, 1, 73, 77, 65, 38, 90, 30, 91, 32, 43, 25, 33, 35, 85, 60, 87, 51, 36, 70, 7, 29, 56, 93, 24, 15, 89, 52, 13, 95, 10, 34, 64, 3, 23, 97)
+	SortArrayInPlace(arr)
+	AssertArrayEq(arr,_
+		Array(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99))
+
+	arr = Array("80", "16", "9", "14", "68", "0", "46", "98", "74", "37", "18", "58", "69", "28", "62", "53", "76", "2", "57", "20", "11", "72", "84", "86", "50", "78", "39", "40", "27", "94", "81", "67", "61", "26", "12", "96", "19", "71", "92", "47", "75", "6", "42", "55", "54", "17", "21", "66", "8", "59", "63", "45", "88", "44", "49", "41", "4", "83", "22", "31", "82", "99", "5", "48", "79", "1", "73", "77", "65", "38", "90", "30", "91", "32", "43", "25", "33", "35", "85", "60", "87", "51", "36", "70", "7", "29", "56", "93", "24", "15", "89", "52", "13", "95", "10", "34", "64", "3", "23", "97")
+	SortArrayInPlace(arr)
+	AssertArrayEq(arr,_
+		Array("0", "1", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "2", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "3", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "4", "40", "41", "42", "43", "44", "45", "46", "47", "48", "49", "5", "50", "51", "52", "53", "54", "55", "56", "57", "58", "59", "6", "60", "61", "62", "63", "64", "65", "66", "67", "68", "69", "7", "70", "71", "72", "73", "74", "75", "76", "77", "78", "79", "8", "80", "81", "82", "83", "84", "85", "86", "87", "88", "89", "9", "90", "91", "92", "93", "94", "95", "96", "97", "98", "99"))
+		
+	' Create N arrays
+	Dim arrs(1) As Variant
+	Dim arr2 As Variant
+	Dim i, j, size As Long
+
+	For i=LBound(arrs) To UBound(arrs)
+		size = Int(Rnd() * 50000) + 50000
+		Redim arr(size-1)
+		For j=LBound(arr) To UBound(arr)
+			arr(j) = Int(Rnd() * 10000) - 5000
+		Next j
+		arrs(i) = arr
+	Next i
+
+	Dim t0, t1 As Double
+	t0 = Now()
+	
+	For Each arr In arrs
+		arr2 = SortedArray(arr)
+		For j=LBound(arr) To UBound(arr)-1
+			AssertEq(arr2(j) <= arr2(j+1), True)
+		Next j
+	Next arr
+
+	t1 = Now()
+	MsgBox(t1 - t0)
+
+	t0 = Now()
+
+	For Each arr In arrs
+		SortArrayInPlace(arr)
+		For j=LBound(arr) To UBound(arr)-1
+			AssertEq(arr(j) <= arr(j+1), True)
+		Next j
+	Next arr		
+		
+	t1 = Now()
+	MsgBox(t1 - t0)
+
 	MsgBox "Shuffle :" & ArrayToString(ShuffledArray(SortedArray(Array(5, 7, 9, 5, 4, 2, 1, 10, 18, 16))))
 End Sub
 
@@ -318,7 +423,7 @@ REM
 ''
 Type ArrayList
 	arr() As Variant
-	size As Integer
+	size As Long
 End Type
 
 ''
@@ -337,7 +442,7 @@ End Function
 ''
 '' Create a new ArrayList, given an initial capacity.
 '' 
-Function NewListWithCapacity(capacity As Integer) As ArrayList
+Function NewListWithCapacity(capacity As Long) As ArrayList
 	Dim list As ArrayList
 	Dim arr(capacity - 1) As Variant
 	
@@ -354,7 +459,7 @@ Function NewListFromArray(arr As Variant) As ArrayList
 
 	Dim list as ArrayList
 	Dim newArr() As Variant
-	Dim capacity As Integer
+	Dim capacity As Long
 
 	If UBound(arr) < 7 Then
 		capacity = 8
@@ -373,7 +478,7 @@ End Function
 ''
 '' Update the list capacity
 ''
-Sub SetListCapacity(list As ArrayList, newCapacity As Integer)
+Sub SetListCapacity(list As ArrayList, newCapacity As Long)
 	Dim arr As Variant
 
 	If newCapacity < list.size Then Exit Sub
@@ -398,7 +503,7 @@ End Sub
 ''
 '' Ensure list capacity
 ''
-Sub _EnsureListCapacity(list As ArrayList, capacity As Integer)
+Sub _EnsureListCapacity(list As ArrayList, capacity As Long)
 	Dim arr As Variant
 
 	If capacity <= UBound(list.arr) + 1 Then Exit Sub
@@ -413,7 +518,7 @@ End Sub
 '' Append an array of elements to a list
 ''
 Sub AppendListElements(list As ArrayList, elements() As Variant)
-	Dim i, newCapacity, elementsSize As Integer
+	Dim i, newCapacity, elementsSize As Long
 	Dim arr() As Variant
 	
 	If LBound(elements) <> 0 Then elements(0) ' trigger an error
@@ -438,7 +543,7 @@ End Function
 ''
 '' Get the element of a list at a given index. 
 ''
-Function GetListElement(list As ArrayList, index As Integer) As Variant
+Function GetListElement(list As ArrayList, index As Long) As Variant
 	If index >= list.size Then list.arr(-1)
 
 	GetListElement = list.arr(index)
@@ -447,7 +552,7 @@ End Function
 ''
 '' Set the element of a list at a given index to a value
 ''
-Sub SetListElement(list As ArrayList, index As Integer, element As Variant)
+Sub SetListElement(list As ArrayList, index As Long, element As Variant)
 	If index >= list.size Then list.arr(-1)
 
 	list.arr(index) = element
@@ -456,9 +561,9 @@ End Sub
 ''
 '' Insert the element at a given index
 ''
-Sub InsertListElement(list As ArrayList, index As Integer, element As Variant)
+Sub InsertListElement(list As ArrayList, index As Long, element As Variant)
 	Dim arr() As Variant
-	Dim i As Integer
+	Dim i As Long
 	
 	_EnsureListCapacity(list, list.size + 1)
 
@@ -473,9 +578,9 @@ End Sub
 ''
 '' Remove the element at a given index
 ''
-Sub RemoveListElement(list As ArrayList, index As Integer)
+Sub RemoveListElement(list As ArrayList, index As Long)
 	Dim arr() As Variant
-	Dim i As Integer
+	Dim i As Long
 	
 	For i = index To list.size - 2
 		list.arr(i) = list.arr(i + 1)
@@ -534,7 +639,7 @@ End Function
 ''
 '' Return the size of a list
 ''
-Function GetListSize(list As ArrayList) As Integer
+Function GetListSize(list As ArrayList) As Long
 	GetListSize = list.size
 End Function
 
@@ -548,8 +653,8 @@ End Function
 ''
 '' Return the index of element in the list, or -1 if element is not in the list
 ''
-Function ListIndexOf(list As ArrayList, element As Variant) As Integer
-	Dim i As Integer
+Function ListIndexOf(list As ArrayList, element As Variant) As Long
+	Dim i As Long
 
 	For i=0 To list.size - 1
 		If list.arr(i) = element Then
@@ -561,8 +666,8 @@ Function ListIndexOf(list As ArrayList, element As Variant) As Integer
 End Function
 
 
-Function ListLastIndexOf(list As ArrayList, element As Variant) As Integer
-	Dim i As Integer
+Function ListLastIndexOf(list As ArrayList, element As Variant) As Long
+	Dim i As Long
 
 	For i=list.size-1 To 0 Step -1
 		If list.arr(i) = element Then
@@ -574,7 +679,7 @@ Function ListLastIndexOf(list As ArrayList, element As Variant) As Integer
 End Function
 
 Function ListToString(list As ArrayList) As String
-	Dim i As Integer
+	Dim i As Long
 
 	Dim newArr(0 To list.size - 1) As String
 	For i=0 To list.size - 1
@@ -931,7 +1036,7 @@ Function MergeMaps(m1 As HashMap, m2 As HashMap) As HashMap
 End Function
 
 Function MapToString(m As HashMap) As String
-	Dim i As Integer
+	Dim i As Long
 	Dim e, p, arr As Variant
 	
 	e = m.map.createElementEnumeration(True)
