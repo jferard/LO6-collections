@@ -295,7 +295,7 @@ Function NewListFromArray(arr As Variant) As ArrayList
 	If UBound(arr) < 7 Then
 		capacity = 8
 	Else
-		capacity = Round(UBound(arr) * 1,5)
+		capacity = Round(UBound(arr) * 1.5)
 	End If
 	
 	newArr = arr
